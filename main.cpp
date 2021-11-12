@@ -218,7 +218,7 @@ void play_game(std::array<std::function<move_t(game_state_t const &, int)>, 2> b
 	}
 }
 
-int get_score_for_moves_left(game_state_t const& state, int player) {
+int get_score_for_moves_left(game_state_t const &state, int player) {
 	int total = 0;
 	for (int i = 0; i < 3; ++i) {
 		total += state.remaining_moves[player][i] * (i * 5);
@@ -240,64 +240,49 @@ int get_score(game_state_t const &state, int player) {
 	return 0;
 }
 
-std::pair<move_t, int> evaluate_moves(game_state_t const &state, int ai_player, int current_player, int depth_left) {
-	int abs_highest_score = INT32_MIN;
-	std::pair<move_t, int> winning_move;
+std::pair<std::optional<move_t>, int> maximize(game_state_t const &state, int player, int depth_left) {
+	int state_score = get_score(state, player);
+	if (state_score == 10000) {
+		return {std::nullopt, 10000};
+	}
 
-	auto moves = get_valid_moves(state, current_player);
-	for (auto const& move : moves) {
+	if (state_score == -10000) {
+		return {std::nullopt, -10000};
+	}
+
+	if (depth_left <= 0) {
+		return {std::nullopt, state_score};
+	}
+	auto moves = get_valid_moves(state, player);
+	std::pair<std::optional<move_t>, int> best_result = {std::nullopt, INT32_MIN};
+	for (auto const &move: moves) {
 		auto new_state = perform_move(state, move);
-		if (new_state) {
-			int score = get_score(state, ai_player);
-			if (score != 0) {
-				return { move, score };
-			} else {
-				if (depth_left > 0) {
-					auto scored_move = evaluate_moves(*new_state, ai_player, 1 - current_player, depth_left - 1);
-					score = scored_move.second;
-				}
-			}
-			if (abs(score) > abs_highest_score) {
-				abs_highest_score = abs(score);
-				winning_move = { move, score };
-			}
 
+		auto res = maximize(*new_state, 1 - player, depth_left - 1);
+		int others_score = -res.second/2;
+		if (others_score > best_result.second) {
+			best_result.first = move;
+			best_result.second = others_score;
 		}
 	}
 
-	return winning_move;
+	return best_result;
 }
 
 move_t smarter_ai(game_state_t const &state, int player) {
-	int highest_score = INT32_MIN;
-	std::pair<move_t, int> winning_move;
-
-	auto moves = get_valid_moves(state, player);
-	for (auto const& move : moves) {
-		auto new_state = perform_move(state, move);
-		if (new_state) {
-			int score = get_score(state, player);
-			if (score != 0) {
-				return move;
-			} else {
-				auto scored_move = evaluate_moves(*new_state, player, 1 - player, 5);
-				score = scored_move.second;
-			}
-			if (score > highest_score) {
-				highest_score = abs(score);
-				winning_move = { move, score };
-			}
-
-		}
+	auto ret = maximize(state, player, 5);
+	if (ret.first) {
+		return *ret.first;
 	}
 
-	return winning_move.first;
+	printf("Something went wrong\n");
+	return {};
 }
 
 int main() {
 	srand((unsigned int) std::time(nullptr));
 
-	play_game({get_move_player, smarter_ai});
+	play_game({get_move_player, smarter_ai });
 	return 0;
 }
 
