@@ -233,26 +233,26 @@ int get_score(game_state_t const &state, int player) {
 		return get_score_for_moves_left(state, player);
 	}
 	if (victory == player)
-		return 10000;
+		return INT32_MAX;
 	if (victory == 1 - player)
-		return -10000;
+		return INT32_MIN;
 
 	return 0;
 }
 
-std::pair<std::optional<move_t>, int> maximize(game_state_t const &state, int player, int depth_left) {
+std::pair<move_t, int> maximize(game_state_t const &state, int player, int depth_left) {
 	auto moves = get_valid_moves(state, player);
-	std::pair<std::optional<move_t>, int> best_result = {std::nullopt, INT32_MIN};
+	std::pair<move_t, int> best_result = {{}, INT32_MIN};
 	for (auto const &move: moves) {
 		auto new_state = perform_move(state, move);
 
 		int state_score = get_score(*new_state, player);
-		if (state_score == 10000) {
-			return {move, 10000};
+		if (state_score == INT32_MAX) {
+			return {move, state_score};
 		}
 
-		if (state_score == -10000) {
-			return {move, -10000};
+		if (state_score == -INT32_MIN) {
+			return {move, state_score};
 		}
 
 		if (depth_left <= 0) {
@@ -272,13 +272,7 @@ std::pair<std::optional<move_t>, int> maximize(game_state_t const &state, int pl
 }
 
 move_t smarter_ai(game_state_t const &state, int player) {
-	auto ret = maximize(state, player, 5);
-	if (ret.first) {
-		return *ret.first;
-	}
-
-	printf("Something went wrong\n");
-	return {};
+	return maximize(state, player, 6).first;
 }
 
 int main() {
