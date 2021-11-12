@@ -1,9 +1,11 @@
+#include <xxhash.h>
 #include <array>
 #include <functional>
 #include <cstdio>
 #include <vector>
 #include <optional>
 #include <ctime>
+#include <unordered_map>
 
 struct board_tile_t {
 	int8_t owner;
@@ -14,7 +16,24 @@ struct game_state_t {
 	board_tile_t board[9];
 	int remaining_moves[2][3];
 	bool player_yielded[2];
+
+	bool operator==(const game_state_t &other) const {
+		return memcmp((int8_t *) this, (int8_t *) &other, sizeof(game_state_t)) == 0;
+	}
 };
+
+namespace std {
+	template<>
+	struct hash<game_state_t> {
+		std::size_t operator()(const game_state_t &k) const {
+			int8_t *data = (int8_t *) &k;
+
+			XXH64_hash_t hash = XXH64(data, sizeof(game_state_t), 1);
+			return hash;
+		}
+	};
+}
+
 
 struct move_t {
 	int player;
@@ -22,6 +41,7 @@ struct move_t {
 	int position;
 	bool yield;
 };
+
 
 bool is_valid_move(game_state_t const &state, move_t const &move) {
 	if (state.remaining_moves[move.player][move.size] > 0) {
@@ -240,7 +260,14 @@ int get_score(game_state_t const &state, int player) {
 	return 0;
 }
 
+std::unordered_map<game_state_t, std::pair<move_t, int>> cache;
+
 std::pair<move_t, int> maximize(game_state_t const &state, int player, int depth_left) {
+	auto ret = cache.find(state);
+	if ( ret != cache.end()) {
+		return ret->second;
+	}
+
 	auto moves = get_valid_moves(state, player);
 	std::pair<move_t, int> best_result = {{}, INT32_MIN};
 	for (auto const &move: moves) {
@@ -261,24 +288,26 @@ std::pair<move_t, int> maximize(game_state_t const &state, int player, int depth
 
 
 		auto res = maximize(*new_state, 1 - player, depth_left - 1);
-		int others_score = -res.second/2;
+		int others_score = -res.second / 2;
 		if (others_score > best_result.second) {
 			best_result.first = move;
 			best_result.second = others_score;
 		}
 	}
 
+	cache.insert_or_assign(state, best_result);
 	return best_result;
 }
 
 move_t smarter_ai(game_state_t const &state, int player) {
-	return maximize(state, player, 6).first;
+	cache.clear();
+	return maximize(state, player, 7).first;
 }
 
 int main() {
 	srand((unsigned int) std::time(nullptr));
 
-	play_game({get_move_player, smarter_ai });
+	play_game({smarter_ai, get_move_player});
 	return 0;
 }
 
