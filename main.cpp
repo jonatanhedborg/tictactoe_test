@@ -241,22 +241,24 @@ int get_score(game_state_t const &state, int player) {
 }
 
 std::pair<std::optional<move_t>, int> maximize(game_state_t const &state, int player, int depth_left) {
-	int state_score = get_score(state, player);
-	if (state_score == 10000) {
-		return {std::nullopt, 10000};
-	}
-
-	if (state_score == -10000) {
-		return {std::nullopt, -10000};
-	}
-
-	if (depth_left <= 0) {
-		return {std::nullopt, state_score};
-	}
 	auto moves = get_valid_moves(state, player);
 	std::pair<std::optional<move_t>, int> best_result = {std::nullopt, INT32_MIN};
 	for (auto const &move: moves) {
 		auto new_state = perform_move(state, move);
+
+		int state_score = get_score(*new_state, player);
+		if (state_score == 10000) {
+			return {move, 10000};
+		}
+
+		if (state_score == -10000) {
+			return {move, -10000};
+		}
+
+		if (depth_left <= 0) {
+			return {move, state_score};
+		}
+
 
 		auto res = maximize(*new_state, 1 - player, depth_left - 1);
 		int others_score = -res.second/2;
